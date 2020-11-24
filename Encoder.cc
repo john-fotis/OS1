@@ -1,57 +1,52 @@
 #include <iostream>
 #include <string.h>
-#include <openssl/md5.h>
-#include "encoder.h"
+
+#include "Encoder.h"
+
 using namespace std;
 
 void calculateMD5(const char * text, char * checksum){
   static const char hexDigits[17] = "0123456789ABCDEF";
   unsigned char digest[MD5_DIGEST_LENGTH];
-  char digest_str[2*MD5_DIGEST_LENGTH+1];
+  char digest_str[2*MD5_DIGEST_LENGTH];
   int i;
 
   // Count digest
-  MD5( (const unsigned char*)text, sizeof(text), digest );
+  MD5((const unsigned char*)text, sizeof(text), digest);
 
   // Convert the hash into a hex string form
   for(i = 0; i < MD5_DIGEST_LENGTH; i++){
-    digest_str[i*2]   = hexDigits[(digest[i] >> 4) & 0xF];
+    digest_str[i*2] = hexDigits[(digest[i] >> 4) & 0xF];
     digest_str[i*2+1] = hexDigits[digest[i] & 0xF];
   }
   digest_str[MD5_DIGEST_LENGTH*2] = '\0';
   strcpy(checksum, digest_str);
 }
 
+void Encoder::setMessageFaulty(message &m){
+  m.succesfull = false;
+}
+
 Encoder::Encoder(){
   m = new message;
-  m->text = new char;
-  m->checksum = new char;
+  strcpy(m->text, "");
+  strcpy(m->checksum, "");
   // Assume succesfull delivery on 1st try
   m->succesfull = true;
 }
 
 Encoder::~Encoder(){
-  delete [] m->checksum;
-  delete [] m->text;
   m = NULL;
 }
 
 void Encoder::receiveMessage(const char &txt){
-  delete [] m->checksum;
-  delete [] m->text;
-  m->text = new char[strlen(&txt)+1];
-  m->checksum = new char[2*MD5_DIGEST_LENGTH+1];
   strcpy(m->text, &txt);
-
   calculateMD5(m->text, m->checksum);
 }
 
 bool Encoder::decodeMessage(const message &msg){
-  char newChecksum[2*MD5_DIGEST_LENGTH+1];
-  delete [] m->checksum;
-  delete [] m->text;
-  m->text = new char[strlen(msg.text) + 1];
-  m->checksum = new char[strlen(msg.checksum) + 1];
+  char newChecksum[2*MD5_DIGEST_LENGTH];
+
   strcpy(m->text, msg.text);
   strcpy(m->checksum, msg.checksum);
   m->succesfull = msg.succesfull;
@@ -67,10 +62,6 @@ bool Encoder::decodeMessage(const message &msg){
   // If checksums don't match request retransmition
   setMessageFaulty(*m);
   return false;
-}
-
-void Encoder::setMessageFaulty(message &m){
-  m.succesfull = false;
 }
 
 message * Encoder::getMessage(){

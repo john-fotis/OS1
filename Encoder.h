@@ -1,11 +1,7 @@
 #ifndef __ENCODER__H
 #define __ENCODER__H
 
-typedef struct{
-  char * text;
-  char * checksum;
-  bool succesfull;
-} message;
+#include "shared_memory.h"
 
 class Encoder{
 private:

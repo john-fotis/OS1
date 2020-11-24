@@ -2,26 +2,27 @@
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
+
 #include "shared_memory.h"
 
-static int getSharedBlock(char * fileName, int size) {
+static int getSharedBlock(char * fileName, int size, unsigned int proj_id) {
   key_t key;
 
-  // Request a key
-  key = ftok(fileName, 0);
-  // And link it to a filename
+  // Request a key and link it to a filename
+  key = ftok(fileName, proj_id);
   if (key == IPC_ERROR) {
     return IPC_ERROR;
   }
-  
   // Create block or get it if it exists
-  return shmget(key, size, 0644 | IPC_CREAT);
+  return shmget(key, size, IPC_CREAT | 0644);
 }
 
-char * attachBlock(char * fileName, int size) {
-  char * result;
+message * attachBlock(char * fileName, int size, unsigned int proj_id) {
+  message * result;
+
   // Request the shared block id
-  int sharedBlockId = getSharedBlock(fileName, size);
+  int sharedBlockId = getSharedBlock(fileName, size, proj_id);
+
   if (sharedBlockId == IPC_ERROR)
     return NULL;
   
@@ -29,24 +30,24 @@ char * attachBlock(char * fileName, int size) {
   Map the shared block to the current proccess
   and return a pointer to it
   */
-  result = (char *)shmat(sharedBlockId, NULL, 0);
-  if (result == (char*)IPC_ERROR) {
+  result = (message *) shmat(sharedBlockId, NULL, 0);
+  if (result == (message *)IPC_ERROR) {
     return NULL;
   }
   
   return result;
 }
 
-bool detachBlock(char * block) {
+bool detachBlock(message * block) {
   return (shmdt(block) != IPC_ERROR);
 }
 
-bool destroyBlock(char * fileName) {
-  int sharedBlockId = getSharedBlock(fileName, 0);
+bool destroyBlock(char * fileName, int size, unsigned int proj_id) {
+  int sharedBlockId = getSharedBlock(fileName, size, proj_id);
 
   if (sharedBlockId == IPC_ERROR) {
     return NULL;
   }
 
-    return(shmctl(sharedBlockId, IPC_RMID, NULL) != IPC_ERROR);
+  return(shmctl(sharedBlockId, IPC_RMID, NULL) != IPC_ERROR);
 }
