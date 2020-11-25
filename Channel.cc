@@ -8,8 +8,8 @@ using namespace std;
 Channel::Channel(float ratio){
   errorRatio = ratio;
   m = new message;
-  strcpy(m->text, "");
-  strcpy(m->checksum, "");
+  strcpy(m->text, "\0");
+  strcpy(m->checksum, "\0");
   m->succesfull = 1;
 }
 

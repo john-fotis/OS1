@@ -1,7 +1,7 @@
 #ifndef __ENCODER__H
 #define __ENCODER__H
 
-#include "shared_memory.h"
+#include "Shared_memory.h"
 
 class Encoder{
 private:

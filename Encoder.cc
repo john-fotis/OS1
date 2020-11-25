@@ -29,8 +29,8 @@ void Encoder::setMessageFaulty(message &m){
 
 Encoder::Encoder(){
   m = new message;
-  strcpy(m->text, "");
-  strcpy(m->checksum, "");
+  strcpy(m->text, "\0");
+  strcpy(m->checksum, "\0");
   // Assume succesfull delivery on 1st try
   m->succesfull = true;
 }

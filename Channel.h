@@ -1,7 +1,7 @@
 #ifndef __CHANNEL__H
 #define __CHANNEL__H
 
-#include "shared_memory.h"
+#include "Shared_memory.h"
 
 class Channel{
 private:

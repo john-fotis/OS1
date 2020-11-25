@@ -16,10 +16,11 @@ message * attachBlock(char * fileName, int size, unsigned int id);
 bool detachBlock(message * block);
 bool destroyBlock(char * block, int size, unsigned int id);
 
-#define P1_ENC1_BLOCK (char *)    "p1.cc"
+// Filenames of shared memory blocks
+#define P1_ENC1_BLOCK   (char *)  "p1.cc"
 #define ENC1_CHAN_BLOCK (char *)  "encoder1.cc"
 #define CHAN_ENC2_BLOCK (char *)  "channel.cc"
-#define ENC2_P2_BLOCK (char *)    "encoder2.cc"
+#define ENC2_P2_BLOCK   (char *)  "encoder2.cc"
 
 // Define semaphores
 #define SEM_PRODUCER  "/p1"
@@ -30,6 +31,6 @@ bool destroyBlock(char * block, int size, unsigned int id);
 #define P1_ENC1_BLOCK_ID    1
 #define ENC1_CHAN_BLOCK_ID  2
 #define CHAN_ENC2_BLOCK_ID  3
-#define ENC2_P1_BLOCK_ID    4
+#define ENC2_P2_BLOCK_ID    4
 
 #endif

@@ -3,7 +3,7 @@
 #include <sys/ipc.h>
 #include <sys/shm.h>
 
-#include "shared_memory.h"
+#include "Shared_memory.h"
 
 static int getSharedBlock(char * fileName, int size, unsigned int proj_id) {
   key_t key;
@@ -31,7 +31,7 @@ message * attachBlock(char * fileName, int size, unsigned int proj_id) {
   and return a pointer to it
   */
   result = (message *) shmat(sharedBlockId, NULL, 0);
-  if (result == (message *)IPC_ERROR) {
+  if (result == (message*)IPC_ERROR) {
     return NULL;
   }
   
