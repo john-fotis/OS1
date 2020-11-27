@@ -3,8 +3,6 @@
 
 #include "Encoder.h"
 
-using namespace std;
-
 void calculateMD5(const char * text, char * checksum){
   static const char hexDigits[17] = "0123456789ABCDEF";
   unsigned char digest[MD5_DIGEST_LENGTH];
@@ -20,47 +18,39 @@ void calculateMD5(const char * text, char * checksum){
     digest_str[i*2+1] = hexDigits[digest[i] & 0xF];
   }
   digest_str[MD5_DIGEST_LENGTH*2] = '\0';
-  strcpy(checksum, digest_str);
-}
-
-void Encoder::setMessageFaulty(message &m){
-  m.succesfull = false;
+  sprintf(checksum, digest_str, "%s");
 }
 
 Encoder::Encoder(){
   m = new message;
-  strcpy(m->text, "\0");
-  strcpy(m->checksum, "\0");
+  sprintf(m->text, "%s", "\0");
+  sprintf(m->checksum, "%s", "\0");
   // Assume succesfull delivery on 1st try
-  m->succesfull = true;
+  m->status = 0;
 }
 
 Encoder::~Encoder(){
   m = NULL;
 }
 
-void Encoder::receiveMessage(const char &txt){
-  strcpy(m->text, &txt);
+void Encoder::receiveMessage(const message &msg) {
+  sprintf(m->text, msg.text, "%s");
   calculateMD5(m->text, m->checksum);
+  m->status = msg.status;
 }
 
 bool Encoder::decodeMessage(const message &msg){
   char newChecksum[2*MD5_DIGEST_LENGTH];
 
-  strcpy(m->text, msg.text);
-  strcpy(m->checksum, msg.checksum);
-  m->succesfull = msg.succesfull;
+  sprintf(m->text, msg.text, "%s");
+  sprintf(m->checksum, msg.checksum, "%s");
+  m->status = msg.status;
   
   calculateMD5(m->text, newChecksum);
-  cout << m->text << endl;
-  cout << newChecksum << endl;
-  cout << ">>>>>>> " << strcmp(m->checksum, newChecksum) << endl;
 
-  if(strcmp(m->checksum, newChecksum) == 0)
+  if(!strncmp(m->checksum, newChecksum, 2*MD5_DIGEST_LENGTH))
     return true;
 
-  // If checksums don't match request retransmition
-  setMessageFaulty(*m);
   return false;
 }
 

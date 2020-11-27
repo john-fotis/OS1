@@ -6,11 +6,10 @@
 class Encoder{
 private:
   message * m;
-  void setMessageFaulty(message &m);
 public:
   Encoder();
   ~Encoder();
-  void receiveMessage(const char &txt);
+  void receiveMessage(const message &msg);
   bool decodeMessage(const message &m);
   message * getMessage();
   char * deliveryMessage();

@@ -9,18 +9,17 @@
 typedef struct {
   char text[BLOCK_SIZE - 2*MD5_DIGEST_LENGTH - sizeof(int)];
   char checksum[2*MD5_DIGEST_LENGTH];
-  bool succesfull;
+  int status;
 } message;
 
-message * attachBlock(char * fileName, int size, unsigned int id);
+message * attachBlock(char * fileName, int size, unsigned int proj_id);
+bool * attachFlagBlock(char * filename, int size, unsigned int proj_id);
 bool detachBlock(message * block);
-bool destroyBlock(char * block, int size, unsigned int id);
+bool detachFlagBlock(bool * block);
+bool destroyBlock(char * blockName, int size, unsigned int proj_id);
 
-// Filenames of shared memory blocks
-#define P1_ENC1_BLOCK   (char *)  "p1.cc"
-#define ENC1_CHAN_BLOCK (char *)  "encoder1.cc"
-#define CHAN_ENC2_BLOCK (char *)  "channel.cc"
-#define ENC2_P2_BLOCK   (char *)  "encoder2.cc"
+// Filename of shared memory blocks
+#define FILENAME (char *) "p1.cc"
 
 // Define semaphores
 #define SEM_PRODUCER  "/p1"
@@ -32,5 +31,6 @@ bool destroyBlock(char * block, int size, unsigned int id);
 #define ENC1_CHAN_BLOCK_ID  2
 #define CHAN_ENC2_BLOCK_ID  3
 #define ENC2_P2_BLOCK_ID    4
+#define DIRECTION_BLOCK_ID  5
 
 #endif

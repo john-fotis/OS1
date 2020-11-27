@@ -5,27 +5,22 @@
 #include <fcntl.h>
 
 #include "Shared_memory.h"
-#include "P.h"
-// #include "encoder.h"
-
-using namespace std;
 
 int main(int argc, char * argv[]) {
   // Checking input validity
   if (argc != 1) {
-    cout << "Correct usage: $./p1.ex //No arguments" << endl;
+    std::cout << "Correct usage: $./p1.ex //No arguments" << std::endl;
     return -1;
   }
 
   char buffer[BLOCK_SIZE - 2 * MD5_DIGEST_LENGTH - sizeof(int)];
-  P p1;
 
   // Set up semaphores
-  sem_t * sem_producer;
-  sem_t * sem_encoder1;
-  sem_t * sem_channel;
-  sem_t * sem_encoder2;
-  sem_t * sem_consumer;
+  sem_t *sem_producer;
+  sem_t *sem_encoder1;
+  sem_t *sem_channel;
+  sem_t *sem_encoder2;
+  sem_t *sem_consumer;
 
   // Unlink them if they already exist before "sem_open"
   sem_unlink(SEM_PRODUCER);
@@ -35,7 +30,7 @@ int main(int argc, char * argv[]) {
   sem_unlink(SEM_CONSUMER);
 
   // P1 semaphore
-  if ((sem_producer = sem_open(SEM_PRODUCER, O_CREAT, 0660, 0)) == SEM_FAILED) {
+  if ((sem_producer = sem_open(SEM_PRODUCER, O_CREAT, 0660, 1)) == SEM_FAILED) {
     perror("sem_open/producer");
     exit(EXIT_FAILURE);
   }
@@ -59,47 +54,72 @@ int main(int argc, char * argv[]) {
   }
 
   // Consumer semaphore
-  if ((sem_consumer = sem_open(SEM_CONSUMER, O_CREAT, 0660, 1)) == SEM_FAILED) {
+  if ((sem_consumer = sem_open(SEM_CONSUMER, O_CREAT, 0660, 0)) == SEM_FAILED) {
     perror("sem_open/consumer");
     exit(EXIT_FAILURE);
   }
 
   // Get the memory block with encoder 1
-  message * block = attachBlock(P1_ENC1_BLOCK, BLOCK_SIZE, P1_ENC1_BLOCK_ID);
+  message * block = attachBlock(FILENAME, BLOCK_SIZE, P1_ENC1_BLOCK_ID);
   if (block == NULL) {
-    cout << "ERROR: Couldn't get block." << endl;
+    std::cout << "ERROR: Couldn't get block." << std::endl;
     return -1;
   }
 
+  // This shared memory block contains the flag that indicates the flow of the message
+  bool * directionFlag = attachFlagBlock(FILENAME, sizeof(bool *), DIRECTION_BLOCK_ID);
+  if (directionFlag == NULL) {
+    std::cout << "ERROR: Couldn't get flag block." << std::endl;
+    return -1;
+  }
+  // Initialize the flow as normal
+  *directionFlag = true;
+
   // Critical section
   do {
-    cout << "Enter your message:\n";
-    cin.getline (buffer, sizeof(buffer));
-    p1.setMessage(buffer);
+    sem_wait(sem_producer);
 
-    sem_wait(sem_consumer);
+    if (*directionFlag) {
+      // Normal operation
+      std::cout << "Enter your message:" << std::endl;
+      std::cin.getline(buffer, sizeof(buffer));
 
-    block->succesfull = 1;
-    strncpy(block->text, buffer, strlen(buffer)+1);
-    strncpy(block->checksum, "\0", 1);
+      sprintf(block->text, "%s", buffer);
+      sprintf(block->checksum, "%s", "\0");
+      if (strcmp(block->text, "TERM")) {
+        // This is a regular message
+        std::cout << "Writing [" << block->text << "] now..." << std::endl;
+        block->status = 0;
+      } else {
+        // This is a controll message - Transmit safely
+        std::cout << "Giving order to stop now..." << std::endl;
+        block->status = 1;
+      }
+    } else {
+      // Encoder 1 is requesting retransmition
+      block->status = 1;
+      std::cout << "I had to rewrite the message: [" << block->text << "]" << std::endl;
+      // Fix direction flag to normal flow
+      *directionFlag = true;
+    }
 
-    cout << "Writing [" << block->text << "] now..." << endl;
-
-    sem_post(sem_producer);
+    // Signal encoder 1
+    sem_post(sem_encoder1);
   } while (strcmp(block->text, "TERM"));
 
-  // Release semaphores and memory
-  sem_close(sem_producer);
-  sem_close(sem_encoder1);
-  sem_close(sem_channel);
-  sem_close(sem_encoder2);
-  sem_close(sem_consumer);
-  sem_unlink(SEM_PRODUCER);
-  sem_unlink(SEM_ENCODER1);
-  sem_unlink(SEM_CHANNEL);
-  sem_unlink(SEM_ENCODER2);
-  sem_unlink(SEM_CONSUMER);
-  detachBlock(block);
-  
-  return 0;
+    // Release semaphores and memory
+    sem_close(sem_producer);
+    sem_close(sem_encoder1);
+    sem_close(sem_channel);
+    sem_close(sem_encoder2);
+    sem_close(sem_consumer);
+    sem_unlink(SEM_PRODUCER);
+    sem_unlink(SEM_ENCODER1);
+    sem_unlink(SEM_CHANNEL);
+    sem_unlink(SEM_ENCODER2);
+    sem_unlink(SEM_CONSUMER);
+    detachBlock(block);
+    detachFlagBlock(directionFlag);
+
+    return 0;
 }

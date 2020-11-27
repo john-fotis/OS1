@@ -3,14 +3,12 @@
 
 #include "Channel.h"
 
-using namespace std;
-
 Channel::Channel(float ratio){
   errorRatio = ratio;
   m = new message;
-  strcpy(m->text, "\0");
-  strcpy(m->checksum, "\0");
-  m->succesfull = 1;
+  sprintf(m->text, "%s", "\0");
+  sprintf(m->checksum, "%s", "\0");
+  m->status = 0;
 }
 
 Channel::~Channel(){
@@ -18,15 +16,15 @@ Channel::~Channel(){
 }
 
 void Channel::receiveMessage(const message &msg){
-  strcpy (m->text, msg.text);
-  strcpy (m->checksum, msg.checksum);
-  m->succesfull = msg.succesfull;
+  sprintf(m->text, msg.text, "%s");
+  sprintf(m->checksum, msg.checksum, "%s");
+  m->status = msg.status;
 
   // If this is the first transmition:
-  if(m->succesfull){
+  if(!m->status){
     double noise = (double) rand() / (RAND_MAX);
     if (noise < errorRatio){
-      cout << noise << endl;
+      std::cout << noise << std::endl;
       unsigned int i = 0;
       while (i < strlen(m->text)){
         m->text[i] = '-';

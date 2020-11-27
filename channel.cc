@@ -2,31 +2,27 @@
 #include <string.h>
 #include <semaphore.h>
 #include <errno.h>
+#include <time.h>
 
 #include "Channel.h"
 
-using namespace std;
-
 int main(int argc, char *argv[]) {
+  srand(time(NULL));
+
   // Checking input validity
-  if (argc != 1) {
-    cout << "Correct usage: $./p2.ex //No arguments" << endl;
+  if (argc != 2) {
+    std::cout << "Correct usage: $./channel.ex [DECIMAL {0-1}]" << std::endl;
     return -1;
   }
 
+  Channel c(atof(argv[1]));
   message * m;
-  Channel c;
 
   // Set up semaphores - They already exist
-  sem_t *sem_producer;
   sem_t *sem_encoder1;
   sem_t *sem_channel;
+  sem_t *sem_encoder2;
 
-  // Producer semaphore
-  if ((sem_producer = sem_open(SEM_PRODUCER, 0)) == SEM_FAILED) {
-    perror("sem_open/producer");
-    exit(EXIT_FAILURE);
-  }
   
   // Encoder 1 semaphore
   if ((sem_encoder1 = sem_open(SEM_ENCODER1, 0)) == SEM_FAILED) {
@@ -40,48 +36,87 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
+  // Encoder 2 semaphore
+  if ((sem_encoder2 = sem_open(SEM_ENCODER2, 0)) == SEM_FAILED) {
+    perror("sem_open/encoder2");
+    exit(EXIT_FAILURE);
+  }
   // Left channel block is shared with encoder 1
-  message *blockLeft = attachBlock(ENC1_CHAN_BLOCK, BLOCK_SIZE, ENC1_CHAN_BLOCK_ID);
+  message *blockLeft = attachBlock(FILENAME, BLOCK_SIZE, ENC1_CHAN_BLOCK_ID);
   if (blockLeft == NULL) {
-    cout << "ERROR: Couldn't get block." << endl;
+    std::cout << "ERROR: Couldn't get block." << std::endl;
     return -1;
   }
 
   // Right channel block is shared with encoder 2
-  message *blockRight = attachBlock(CHAN_ENC2_BLOCK, BLOCK_SIZE, CHAN_ENC2_BLOCK_ID);
+  message *blockRight = attachBlock(FILENAME, BLOCK_SIZE, CHAN_ENC2_BLOCK_ID);
   if (blockRight == NULL) {
-    cout << "ERROR: Couldn't get block." << endl;
+    std::cout << "ERROR: Couldn't get block." << std::endl;
+    return -1;
+  }
+
+  // This shared memory block contains the flag that indicates the flow of the message
+  bool *directionFlag = attachFlagBlock(FILENAME, sizeof(bool *), DIRECTION_BLOCK_ID);
+  if (directionFlag == NULL) {
+    std::cout << "ERROR: Couldn't get flag block." << std::endl;
     return -1;
   }
 
   // Critical section
   do {
-    sem_wait(sem_encoder1);
+    sem_wait(sem_channel);
 
-    cout << "Channel from Encoder1: [" << blockLeft->text << "]" << endl;
-    c.receiveMessage(*blockLeft);
-    
+    if (*directionFlag) {
+      std::cout << "Channel from Encoder 1: [" << blockLeft->text << "]" << std::endl;
+      // Pass the message from the left side to the right
+      c.receiveMessage(*blockLeft);
+    } else {
+      std::cout << "Channel from Encoder 2: [" << blockRight->text << "]" << std::endl;
+      // Pass the message from the right side to the left
+      c.receiveMessage(*blockRight);
+    }
+    // And retrieve it from the other end
     m = c.transferMessage();
-    strncpy(blockRight->text, m->text, sizeof(m->text));
-    strncpy(blockRight->checksum, m->checksum, sizeof(m->checksum));
-    blockRight->succesfull = m->succesfull;
-    cout << "Channel to encoder 2: [" << blockRight->text << "]" << endl;
-    
-    sem_post(sem_channel);
+
+    switch(m->status) {
+      case -1:
+        // This message is corrupted - push it back to enc1
+        sprintf(blockLeft->text, blockRight->text, "%s");
+        sprintf(blockLeft->checksum, blockRight->checksum, "%s");
+        blockLeft->status = blockRight->status;
+        std::cout << "Requesting retransmition from Encoder 1..." << std::endl;
+        // Signal encoder 1
+        sem_post(sem_encoder1);
+        break;
+      case 0:
+        // Unprotected message - 1st try -> send it to enc2
+      case 1:
+        // Protected message - Control message or 2nd try
+        sprintf(blockRight->text, m->text, "%s");
+        sprintf(blockRight->checksum, m->checksum, "%s");
+        blockRight->status = m->status;
+        std::cout << "Channel to Encoder 2: [" << blockRight->text << "]" << std::endl;
+        // Signal encoder 2
+        sem_post(sem_encoder2);
+        break;
+      default:
+        break;
+    }
   } while (strcmp(blockRight->text, "TERM"));
 
   // Release semaphores and memory
-  sem_close(sem_producer);
   sem_close(sem_encoder1);
   sem_close(sem_channel);
+  sem_close(sem_encoder2);
   detachBlock(blockLeft);
   detachBlock(blockRight);
+  detachFlagBlock(directionFlag);
 
   // Delete the shared memory after it's no longer used
-  if (destroyBlock(ENC1_CHAN_BLOCK, BLOCK_SIZE, ENC1_CHAN_BLOCK_ID)) {
-    cout << "Destroyed block [" << ENC1_CHAN_BLOCK << "]" << endl;
+  if (destroyBlock(FILENAME, BLOCK_SIZE, ENC1_CHAN_BLOCK_ID)) {
+    std::cout << "Destroyed block [" << ENC1_CHAN_BLOCK_ID << "]" << std::endl;
   } else {
-    cout << "Couldn't destroy block [" << ENC1_CHAN_BLOCK << "]" << endl;
+    std::cout << "Couldn't destroy block [" << ENC1_CHAN_BLOCK_ID << "]" << std::endl;
     return -1;
   }
 

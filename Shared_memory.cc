@@ -22,14 +22,11 @@ message * attachBlock(char * fileName, int size, unsigned int proj_id) {
 
   // Request the shared block id
   int sharedBlockId = getSharedBlock(fileName, size, proj_id);
-
   if (sharedBlockId == IPC_ERROR)
     return NULL;
   
-  /* 
-  Map the shared block to the current proccess
-  and return a pointer to it
-  */
+  // Map the shared block to the current proccess
+  // and return a pointer to it
   result = (message *) shmat(sharedBlockId, NULL, 0);
   if (result == (message*)IPC_ERROR) {
     return NULL;
@@ -38,7 +35,32 @@ message * attachBlock(char * fileName, int size, unsigned int proj_id) {
   return result;
 }
 
+bool * attachFlagBlock(char * fileName, int size, unsigned int proj_id) {
+  bool * result;
+
+  // Request the shared block id
+  int sharedBlockId = getSharedBlock(fileName, size, proj_id);
+
+  if (sharedBlockId == IPC_ERROR)
+    return NULL;
+
+  /* 
+  Map the shared block to the current proccess
+  and return a pointer to it
+  */
+  result = (bool *)shmat(sharedBlockId, NULL, 0);
+  if (result == (bool *)IPC_ERROR) {
+    return NULL;
+  }
+
+  return result;
+}
+
 bool detachBlock(message * block) {
+  return (shmdt(block) != IPC_ERROR);
+}
+
+bool detachFlagBlock(bool *block) {
   return (shmdt(block) != IPC_ERROR);
 }
 

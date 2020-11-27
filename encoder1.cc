@@ -5,12 +5,10 @@
 
 #include "Encoder.h"
 
-using namespace std;
-
 int main(int argc, char *argv[]) {
   // Checking input validity
   if (argc != 1) {
-    cout << "Correct usage: $./encoder1.ex //No arguments" << endl;
+    std::cout << "Correct usage: $./encoder1.ex //No arguments" << std::endl;
     return -1;
   }
 
@@ -18,6 +16,7 @@ int main(int argc, char *argv[]) {
   message * m;
 
   // Set up semaphores - They already exist
+  sem_t *sem_channel;
   sem_t *sem_producer;
   sem_t *sem_encoder1;
 
@@ -33,47 +32,72 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
+  // Channel semaphore
+  if ((sem_channel = sem_open(SEM_CHANNEL, 0)) == SEM_FAILED) {
+    perror("sem_open/channel");
+    exit(EXIT_FAILURE);
+  }
+
   // Left encoder 1 block is shared with p1
-  message *blockLeft = attachBlock(P1_ENC1_BLOCK, BLOCK_SIZE, P1_ENC1_BLOCK_ID);
+  message *blockLeft = attachBlock(FILENAME, BLOCK_SIZE, P1_ENC1_BLOCK_ID);
   if (blockLeft == NULL) {
-    cout << "ERROR: Couldn't get block." << endl;
+    std::cout << "ERROR: Couldn't get block." << std::endl;
     return -1;
   }
 
   // Right encoder 1 block is shared with channel
-  message *blockRight = attachBlock(ENC1_CHAN_BLOCK, BLOCK_SIZE, ENC1_CHAN_BLOCK_ID);
+  message *blockRight = attachBlock(FILENAME, BLOCK_SIZE, ENC1_CHAN_BLOCK_ID);
   if (blockRight == NULL) {
-    cout << "ERROR: Couldn't get block." << endl;
+    std::cout << "ERROR: Couldn't get block." << std::endl;
+    return -1;
+  }
+
+  // This shared memory block contains the flag that indicates the flow of the message
+  bool *directionFlag = attachFlagBlock(FILENAME, sizeof(bool *), DIRECTION_BLOCK_ID);
+  if (directionFlag == NULL) {
+    std::cout << "ERROR: Couldn't get flag block." << std::endl;
     return -1;
   }
 
   // Critical section
   do {
-    sem_wait(sem_producer);
+    sem_wait(sem_encoder1);
 
-    cout << "Encoder 1 from P1: [" << blockLeft->text << "]" << endl;
-    enc1.receiveMessage(*blockLeft->text);
+    if (*directionFlag) {
+      // Normal operation
+      std::cout << "Encoder 1 from P1: [" << blockLeft->text << "]" << std::endl;
+      enc1.receiveMessage(*blockLeft);
+      m = enc1.getMessage();
 
-    m = enc1.getMessage();
-    strncpy(blockRight->text, m->text, sizeof(m->text));
-    strncpy(blockRight->checksum, m->checksum, sizeof(m->checksum));
-    blockRight->succesfull = m->succesfull;
-    cout << "Encoder 1 to Channel: [" << blockRight->text << "]" << endl;
+      // Protected message
+      sprintf(blockRight->text, m->text, "%s");
+      sprintf(blockRight->checksum, m->checksum, "%s");
+      blockRight->status = m->status;
+      std::cout << "Encoder 1 to Channel: [" << blockRight->text << "]" << std::endl;
+      // Signal channel
+      sem_post(sem_channel);
+    } else {
+      // Channel is requesting restransmition of a message
+      std::cout << "Encoder 1 from Channel: [" << blockRight->text << "]" << std::endl;
+      // Signal p1 to resend
+      sem_post(sem_producer);
+    }
 
-    sem_post(sem_encoder1);
   } while (strcmp(blockRight->text, "TERM"));
 
   // Release semaphores and memory
   sem_close(sem_producer);
   sem_close(sem_encoder1);
+  sem_close(sem_channel);
   detachBlock(blockLeft);
   detachBlock(blockRight);
+  detachFlagBlock(directionFlag);
 
   // Delete the shared memory after it's no longer used
-  if (destroyBlock(P1_ENC1_BLOCK, BLOCK_SIZE, P1_ENC1_BLOCK_ID)) {
-    cout << "Destroyed block [" << P1_ENC1_BLOCK << "]" << endl;
+  if (destroyBlock(FILENAME, BLOCK_SIZE, P1_ENC1_BLOCK_ID)) {
+    std::cout << "Destroyed block [" << P1_ENC1_BLOCK_ID << "]" << std::endl;
   } else {
-    cout << "Couldn't destroy block [" << P1_ENC1_BLOCK << "]" << endl;
+    std::cout << "Couldn't destroy block [" << P1_ENC1_BLOCK_ID << "]" << std::endl;
     return -1;
   }
 
