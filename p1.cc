@@ -79,32 +79,39 @@ int main(int argc, char * argv[]) {
   do {
     sem_wait(sem_producer);
 
-    if (*directionFlag) {
-      // Normal operation
-      std::cout << "Enter your message:" << std::endl;
-      std::cin.getline(buffer, sizeof(buffer));
-
-      sprintf(block->text, "%s", buffer);
-      sprintf(block->checksum, "%s", "\0");
-      if (strcmp(block->text, "TERM")) {
-        // This is a regular message
-        std::cout << "Writing [" << block->text << "] now..." << std::endl;
-        block->status = 0;
-      } else {
-        // This is a controll message - Transmit safely
-        std::cout << "Giving order to stop now..." << std::endl;
-        block->status = 1;
-      }
-    } else {
+    if (block->status == -1) {
       // Encoder 1 is requesting retransmition
       block->status = 1;
       std::cout << "I had to rewrite the message: [" << block->text << "]" << std::endl;
-      // Fix direction flag to normal flow
-      *directionFlag = true;
-    }
+    } else {
+      if (!*directionFlag) {
+        // Received response from p2
+        std::cout << "P2's response: [" << block->text << "]" << std::endl;
+      }
+      if (strcmp(block->text, "TERM")) {
+        // Write a new message
+        std::cout << "Enter your message:" << std::endl;
+        std::cin.getline(buffer, sizeof(buffer));
+        if (strcmp(buffer, "TERM")) {
+          // This is a regular message
+          std::cout << "Writing [" << buffer << "] now..." << std::endl;
+          block->status = 0;
+        } else {
+          // This is a control message - Transmit safely
+          std::cout << "Giving order to stop now..." << std::endl;
+          block->status = 1;
+        }
 
-    // Signal encoder 1
-    sem_post(sem_encoder1);
+        // Fix direction flag to normal flow
+        *directionFlag = true;
+
+        sprintf(block->text, "%s", buffer);
+        sprintf(block->checksum, "%s", "\0");
+        
+        // Signal encoder 1
+        sem_post(sem_encoder1);
+      }
+    }
   } while (strcmp(block->text, "TERM"));
 
     // Release semaphores and memory

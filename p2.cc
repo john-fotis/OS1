@@ -12,9 +12,11 @@ int main(int argc, char *argv[]) {
     return -1;
   }
 
+  char buffer[BLOCK_SIZE - 2 * MD5_DIGEST_LENGTH - sizeof(int)];
+
   // Set up semaphores - They already exist
+  sem_t *sem_encoder2;
   sem_t *sem_consumer;
-  sem_t *sem_producer;
 
   // P2 semaphore
   if ((sem_consumer = sem_open(SEM_CONSUMER, 0)) == SEM_FAILED) {
@@ -22,9 +24,9 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
-  // P1 semaphore
-  if ((sem_producer = sem_open(SEM_PRODUCER, 0)) == SEM_FAILED) {
-    perror("sem_open/producer");
+  // Encoder 2 semaphore
+  if ((sem_encoder2 = sem_open(SEM_ENCODER2, 0)) == SEM_FAILED) {
+    perror("sem_open/encoder2");
     exit(EXIT_FAILURE);
   }
 
@@ -35,29 +37,66 @@ int main(int argc, char *argv[]) {
     return -1;
   }
 
+  // This shared memory block contains the flag that indicates the flow of the message
+  bool *directionFlag = attachFlagBlock(FILENAME, sizeof(bool *), DIRECTION_BLOCK_ID);
+  if (directionFlag == NULL) {
+    std::cout << "ERROR: Couldn't get flag block." << std::endl;
+    return -1;
+  }
+
   // Critical section
   do {
     sem_wait(sem_consumer);
 
-    if (strlen(block->text) > 0) {
-      std::cout << "Reading: [" << block->text << "]" << std::endl;
+    if (block->status == -1) {
+      // Encoder 1 is requesting retransmition
+      block->status = 1;
+      std::cout << "I had to rewrite the message: [" << block->text << "]" << std::endl;
     } else {
-      std::cout << "No message found" << std::endl;
-    }
+      // Received message from p1
+      std::cout << "Reading: [" << block->text << "]" << std::endl;
+      if (strcmp(block->text, "TERM")) {
+        std::cout << "Write a response:" << std::endl;
+        std::cin.getline(buffer, sizeof(buffer));
+        if (strcmp(buffer, "TERM")) {
+          // This is a regular message
+          std::cout << "Replying [" << buffer << "] now..." << std::endl;
+          block->status = 0;
+        } else {
+          // This is a control message - Transmit safely
+          std::cout << "Giving order to stop now..." << std::endl;
+          block->status = 1;
+        }
+        // Revert the flow
+        *directionFlag = false;
 
-    sem_post(sem_producer);
+        sprintf(block->text, "%s", buffer);
+        sprintf(block->checksum, "%s", "\0");
+        // Signal encoder 2
+        sem_post(sem_encoder2);
+      }
+    }
   } while (strcmp(block->text, "TERM"));
 
   // Release semaphores and memory
-  sem_close(sem_producer);
+  sem_close(sem_encoder2);
   sem_close(sem_consumer);
   detachBlock(block);
+  detachFlagBlock(directionFlag);
 
   // Delete the shared memory after it's no longer used
   if (destroyBlock(FILENAME, BLOCK_SIZE, ENC2_P2_BLOCK_ID)) {
     std::cout << "Destroyed block [" << ENC2_P2_BLOCK_ID << "]" << std::endl;
   } else {
     std::cout << "Couldn't destroy block [" << ENC2_P2_BLOCK_ID << "]" << std::endl;
+    return -1;
+  }
+
+  // Delete the flag shared memory
+  if (destroyBlock(FILENAME, BLOCK_SIZE, DIRECTION_BLOCK_ID)) {
+    std::cout << "Destroyed block [" << DIRECTION_BLOCK_ID << "]" << std::endl;
+  } else {
+    std::cout << "Couldn't destroy block [" << DIRECTION_BLOCK_ID << "]" << std::endl;
     return -1;
   }
 

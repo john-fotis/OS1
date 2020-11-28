@@ -13,6 +13,7 @@ int main(int argc, char *argv[]) {
   }
 
   Encoder enc2;
+  message * m;
 
   // Set up semaphores - They already exist
   sem_t *sem_channel;
@@ -61,27 +62,46 @@ int main(int argc, char *argv[]) {
   // Critical Section
   do {
     sem_wait(sem_encoder2);
-    int i = sem_getvalue(sem_encoder2, &i);
-    std::cout << i << std::endl;
 
-    if (enc2.decodeMessage(*blockLeft)) {
+    if (*directionFlag) {
+      // Flow left: -> right
       std::cout << "Encoder 2 from Channel: [" << blockLeft->text << "]" << std::endl;
-      // Message decoded successfully
-      sprintf(blockRight->text, blockLeft->text, "%s");
+      if (blockLeft->status == -1) {
+        // Channel is requesting restransmition of a message
+        blockRight->status = -1;
+        // Signal p2 to resend
+        sem_post(sem_consumer);
+      } else {
+        // This is a message from p1
+        if (enc2.decodeMessage(*blockLeft)) {
+          // Message decoded successfully
+          sprintf(blockRight->text, blockLeft->text, "%s");
+          sprintf(blockRight->checksum, blockLeft->checksum, "%s");
+          blockRight->status = blockLeft->status;
 
-      std::cout << "Encoder 2 to P2: [" << blockRight->text << "]" << std::endl;
-      std::cout << blockLeft->status << "]" << std::endl;
-
-      // Signal consumer
-      i = sem_getvalue(sem_encoder2, &i);
-      std::cout << i << std::endl;
-      sem_post(sem_consumer);
+          std::cout << "Encoder 2 to P2: [" << blockRight->text << "]" << std::endl;
+          // Signal p2
+          sem_post(sem_consumer);
+        } else {
+          std::cout << "Message corrupted - Requesting retransmition..." << std::endl;
+          // Update the message status
+          blockLeft->status = -1;
+          // Revert the flow of transmition
+          *directionFlag = false;
+          // Signal channel
+          sem_post(sem_channel);
+        }
+      }
     } else {
-      std::cout << "Message corrupted - Requesting retransmition..." << std::endl;
-      // Update the message status
-      blockLeft->status = -1;
-      // Revert the flow of transmition
-      *directionFlag = false;
+      // Normal operation p2 -> p1
+      std::cout << "Encoder 2 from P2: [" << blockRight->text << "]" << std::endl;
+      enc2.receiveMessage(*blockRight);
+      m = enc2.getMessage();
+      // Just pass the message to channel
+      sprintf(blockLeft->text, m->text, "%s");
+      sprintf(blockLeft->checksum, m->checksum, "%s");
+      blockLeft->status = m->status;
+      std::cout << "Encoder 2 to Channel: [" << blockLeft->text << "]" << std::endl;
       // Signal channel
       sem_post(sem_channel);
     }

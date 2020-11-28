@@ -67,6 +67,7 @@ int main(int argc, char *argv[]) {
     sem_wait(sem_channel);
 
     if (*directionFlag) {
+      // Flow left -> right
       std::cout << "Channel from Encoder 1: [" << blockLeft->text << "]" << std::endl;
       // Pass the message from the left side to the right
       c.receiveMessage(*blockLeft);
@@ -92,12 +93,21 @@ int main(int argc, char *argv[]) {
         // Unprotected message - 1st try -> send it to enc2
       case 1:
         // Protected message - Control message or 2nd try
-        sprintf(blockRight->text, m->text, "%s");
-        sprintf(blockRight->checksum, m->checksum, "%s");
-        blockRight->status = m->status;
-        std::cout << "Channel to Encoder 2: [" << blockRight->text << "]" << std::endl;
-        // Signal encoder 2
-        sem_post(sem_encoder2);
+        if (*directionFlag) {
+          sprintf(blockRight->text, m->text, "%s");
+          sprintf(blockRight->checksum, m->checksum, "%s");
+          blockRight->status = m->status;
+          std::cout << "Channel to Encoder 2: [" << blockRight->text << "]" << std::endl;
+          // Signal encoder 2
+          sem_post(sem_encoder2);
+        } else {
+          sprintf(blockLeft->text, m->text, "%s");
+          sprintf(blockLeft->checksum, m->checksum, "%s");
+          blockLeft->status = m->status;
+          std::cout << "Channel to Encoder 2: [" << blockLeft->text << "]" << std::endl;
+          // Signal encoder 1
+          sem_post(sem_encoder1);
+        }
         break;
       default:
         break;

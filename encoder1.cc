@@ -64,12 +64,11 @@ int main(int argc, char *argv[]) {
     sem_wait(sem_encoder1);
 
     if (*directionFlag) {
-      // Normal operation
+      // Normal operation p1 -> p2
       std::cout << "Encoder 1 from P1: [" << blockLeft->text << "]" << std::endl;
       enc1.receiveMessage(*blockLeft);
       m = enc1.getMessage();
-
-      // Protected message
+      // Just pass the message to channel
       sprintf(blockRight->text, m->text, "%s");
       sprintf(blockRight->checksum, m->checksum, "%s");
       blockRight->status = m->status;
@@ -77,12 +76,35 @@ int main(int argc, char *argv[]) {
       // Signal channel
       sem_post(sem_channel);
     } else {
-      // Channel is requesting restransmition of a message
+      // Flow: left <- right
       std::cout << "Encoder 1 from Channel: [" << blockRight->text << "]" << std::endl;
-      // Signal p1 to resend
-      sem_post(sem_producer);
-    }
+      if (blockRight->status == -1) {
+        // Channel is requesting restransmition of a message
+        blockLeft->status = -1;
+        // Signal p1 to resend
+        sem_post(sem_producer);
+      } else {
+        // This is a message from p2
+        if (enc1.decodeMessage(*blockRight)) {
+          // Message decoded successfully
+          sprintf(blockLeft->text, blockRight->text, "%s");
+          sprintf(blockLeft->checksum, blockRight->checksum, "%s");
+          blockLeft->status = blockRight->status;
 
+          std::cout << "Encoder 2 to P2: [" << blockLeft->text << "]" << std::endl;
+          // Signal p1
+          sem_post(sem_producer);
+        } else {
+          std::cout << "Message corrupted - Requesting retransmition..." << std::endl;
+          // Update the message status
+          blockRight->status = -1;
+          // Revert the flow of transmition
+          *directionFlag = true;
+          // Signal channel
+          sem_post(sem_channel);
+        }
+      }
+    }
   } while (strcmp(blockRight->text, "TERM"));
 
   // Release semaphores and memory
