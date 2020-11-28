@@ -104,7 +104,7 @@ int main(int argc, char *argv[]) {
           sprintf(blockLeft->text, m->text, "%s");
           sprintf(blockLeft->checksum, m->checksum, "%s");
           blockLeft->status = m->status;
-          std::cout << "Channel to Encoder 2: [" << blockLeft->text << "]" << std::endl;
+          std::cout << "Channel to Encoder 1: [" << blockLeft->text << "]" << std::endl;
           // Signal encoder 1
           sem_post(sem_encoder1);
         }

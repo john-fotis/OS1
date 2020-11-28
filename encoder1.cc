@@ -91,7 +91,7 @@ int main(int argc, char *argv[]) {
           sprintf(blockLeft->checksum, blockRight->checksum, "%s");
           blockLeft->status = blockRight->status;
 
-          std::cout << "Encoder 2 to P2: [" << blockLeft->text << "]" << std::endl;
+          std::cout << "Encoder 1 to P1: [" << blockLeft->text << "]" << std::endl;
           // Signal p1
           sem_post(sem_producer);
         } else {
