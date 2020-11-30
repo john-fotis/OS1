@@ -48,41 +48,48 @@ int main(int argc, char *argv[]) {
   do {
     sem_wait(sem_consumer);
 
+    if ((*directionFlag && !strcmp(block->text, "TERM"))) {
+      // If you got a "TERM" message from P1:
+      break;
+    }
+
     if (block->status == -1) {
-      // Encoder 1 is requesting retransmition
+      // Encoder 2 is requesting retransmition
       block->status = 1;
       std::cout << "I had to rewrite the message: [" << block->text << "]" << std::endl;
     } else {
       // Received message from p1
       std::cout << "Reading: [" << block->text << "]" << std::endl;
-      if (strcmp(block->text, "TERM")) {
-        std::cout << "Write a response:" << std::endl;
-        std::cin.getline(buffer, sizeof(buffer));
-        if (strcmp(buffer, "TERM")) {
-          // This is a regular message
-          std::cout << "Replying [" << buffer << "] now..." << std::endl;
-          block->status = 0;
-        } else {
-          // This is a control message - Transmit safely
-          std::cout << "Giving order to stop now..." << std::endl;
-          block->status = 1;
-        }
-        // Revert the flow
-        *directionFlag = false;
-
-        sprintf(block->text, "%s", buffer);
-        sprintf(block->checksum, "%s", "\0");
-        // Signal encoder 2
-        sem_post(sem_encoder2);
+      // Write a reply
+      std::cout << "Write a response:" << std::endl;
+      std::cin.getline(buffer, sizeof(buffer));
+      if (strcmp(buffer, "TERM")) {
+        // This is a regular message
+        std::cout << "Replying [" << buffer << "] now..." << std::endl;
+        block->status = 0;
+      } else {
+        // This is a control message - Transmit safely
+        std::cout << "Giving order to stop now..." << std::endl;
+        block->status = 1;
       }
     }
+
+    // Revert the flow
+    *directionFlag = false;
+
+    sprintf(block->text, "%s", buffer);
+    sprintf(block->checksum, "%s", "\0");
+
+    // Signal encoder 2
+    sem_post(sem_encoder2);
+
   } while (strcmp(block->text, "TERM"));
 
   // Release semaphores and memory
   sem_close(sem_encoder2);
   sem_close(sem_consumer);
   detachBlock(block);
-  detachFlagBlock(directionFlag);
+  detachBlock(directionFlag);
 
   // Delete the shared memory after it's no longer used
   if (destroyBlock(FILENAME, BLOCK_SIZE, ENC2_P2_BLOCK_ID)) {
@@ -93,7 +100,7 @@ int main(int argc, char *argv[]) {
   }
 
   // Delete the flag shared memory
-  if (destroyBlock(FILENAME, BLOCK_SIZE, DIRECTION_BLOCK_ID)) {
+  if (destroyBlock(FILENAME, DIRECTION_BLOCK_ID)) {
     std::cout << "Destroyed block [" << DIRECTION_BLOCK_ID << "]" << std::endl;
   } else {
     std::cout << "Couldn't destroy block [" << DIRECTION_BLOCK_ID << "]" << std::endl;

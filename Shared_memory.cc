@@ -60,7 +60,7 @@ bool detachBlock(message * block) {
   return (shmdt(block) != IPC_ERROR);
 }
 
-bool detachFlagBlock(bool *block) {
+bool detachBlock(bool *block) {
   return (shmdt(block) != IPC_ERROR);
 }
 
@@ -72,4 +72,14 @@ bool destroyBlock(char * fileName, int size, unsigned int proj_id) {
   }
 
   return(shmctl(sharedBlockId, IPC_RMID, NULL) != IPC_ERROR);
+}
+
+bool destroyBlock(char *fileName, unsigned int proj_id) {
+  int sharedBlockId = getSharedBlock(fileName, sizeof(bool *), proj_id);
+
+  if (sharedBlockId == IPC_ERROR) {
+    return NULL;
+  }
+
+  return (shmctl(sharedBlockId, IPC_RMID, NULL) != IPC_ERROR);
 }

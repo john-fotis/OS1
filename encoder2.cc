@@ -75,9 +75,7 @@ int main(int argc, char *argv[]) {
         // This is a message from p1
         if (enc2.decodeMessage(*blockLeft)) {
           // Message decoded successfully
-          sprintf(blockRight->text, blockLeft->text, "%s");
-          sprintf(blockRight->checksum, blockLeft->checksum, "%s");
-          blockRight->status = blockLeft->status;
+          memcpy(blockRight, blockLeft, sizeof(*blockLeft));
 
           std::cout << "Encoder 2 to P2: [" << blockRight->text << "]" << std::endl;
           // Signal p2
@@ -95,12 +93,10 @@ int main(int argc, char *argv[]) {
     } else {
       // Normal operation p2 -> p1
       std::cout << "Encoder 2 from P2: [" << blockRight->text << "]" << std::endl;
-      enc2.receiveMessage(*blockRight);
+      enc2.encodeMessage(*blockRight);
       m = enc2.getMessage();
       // Just pass the message to channel
-      sprintf(blockLeft->text, m->text, "%s");
-      sprintf(blockLeft->checksum, m->checksum, "%s");
-      blockLeft->status = m->status;
+      memcpy(blockLeft, m, sizeof(*blockLeft));
       std::cout << "Encoder 2 to Channel: [" << blockLeft->text << "]" << std::endl;
       // Signal channel
       sem_post(sem_channel);
@@ -113,10 +109,10 @@ int main(int argc, char *argv[]) {
   sem_close(sem_consumer);
   detachBlock(blockLeft);
   detachBlock(blockRight);
-  detachFlagBlock(directionFlag);
+  detachBlock(directionFlag);
 
   // Delete the shared memory after it's no longer used
-  if (destroyBlock(FILENAME, BLOCK_SIZE, CHAN_ENC2_BLOCK_ID)) {
+  if (destroyBlock(FILENAME, sizeof(bool *), CHAN_ENC2_BLOCK_ID)) {
     std::cout << "Destroyed block [" << CHAN_ENC2_BLOCK_ID << "]" << std::endl;
   } else {
     std::cout << "Couldn't destroy block [" << CHAN_ENC2_BLOCK_ID << "]" << std::endl;

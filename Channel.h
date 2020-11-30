@@ -8,7 +8,7 @@ private:
   float errorRatio;
   message * m;
 public:
-  Channel(float ratio = 1.0);
+  Channel(float ratio = 0.0);
   ~Channel();
   void receiveMessage(const message &msg);
   message * transferMessage();

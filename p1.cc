@@ -79,6 +79,11 @@ int main(int argc, char * argv[]) {
   do {
     sem_wait(sem_producer);
 
+    if ((!*directionFlag && !strcmp(block->text, "TERM"))) {
+      // If you got a "TERM" message from P2:
+      break;
+    }
+
     if (block->status == -1) {
       // Encoder 1 is requesting retransmition
       block->status = 1;
@@ -88,30 +93,29 @@ int main(int argc, char * argv[]) {
         // Received response from p2
         std::cout << "P2's response: [" << block->text << "]" << std::endl;
       }
-      if (strcmp(block->text, "TERM")) {
-        // Write a new message
-        std::cout << "Enter your message:" << std::endl;
-        std::cin.getline(buffer, sizeof(buffer));
-        if (strcmp(buffer, "TERM")) {
-          // This is a regular message
-          std::cout << "Writing [" << buffer << "] now..." << std::endl;
-          block->status = 0;
-        } else {
-          // This is a control message - Transmit safely
-          std::cout << "Giving order to stop now..." << std::endl;
-          block->status = 1;
-        }
-
-        // Fix direction flag to normal flow
-        *directionFlag = true;
-
-        sprintf(block->text, "%s", buffer);
-        sprintf(block->checksum, "%s", "\0");
-        
-        // Signal encoder 1
-        sem_post(sem_encoder1);
+      // Write a new message
+      std::cout << "Enter your message:" << std::endl;
+      std::cin.getline(buffer, sizeof(buffer));
+      if (strcmp(buffer, "TERM")) {
+        // This is a regular message
+        std::cout << "Writing [" << buffer << "] now..." << std::endl;
+        block->status = 0;
+      } else {
+      // This is a control message - Transmit safely
+      std::cout << "Giving order to stop now..." << std::endl;
+      block->status = 1;
       }
     }
+
+    // Fix direction flag to normal flow
+    *directionFlag = true;
+
+    sprintf(block->text, "%s", buffer);
+    sprintf(block->checksum, "%s", "\0");
+
+    // Signal encoder 1
+    sem_post(sem_encoder1);
+    
   } while (strcmp(block->text, "TERM"));
 
     // Release semaphores and memory
@@ -126,7 +130,7 @@ int main(int argc, char * argv[]) {
     sem_unlink(SEM_ENCODER2);
     sem_unlink(SEM_CONSUMER);
     detachBlock(block);
-    detachFlagBlock(directionFlag);
+    detachBlock(directionFlag);
 
     return 0;
 }

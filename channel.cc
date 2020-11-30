@@ -8,14 +8,18 @@
 
 int main(int argc, char *argv[]) {
   srand(time(NULL));
-
+  float noise;
   // Checking input validity
-  if (argc != 2) {
-    std::cout << "Correct usage: $./channel.ex [DECIMAL {0-1}]" << std::endl;
+  if (argc == 1) {
+    noise = 0.0;
+  } else if (argc == 2) {
+    noise = atof(argv[1]);
+  } else {
+    std::cout << "Correct usage: $./channel.ex (DECIMAL {0-1})" << std::endl;
     return -1;
   }
 
-  Channel c(atof(argv[1]));
+  Channel c(noise);
   message * m;
 
   // Set up semaphores - They already exist
@@ -23,7 +27,6 @@ int main(int argc, char *argv[]) {
   sem_t *sem_channel;
   sem_t *sem_encoder2;
 
-  
   // Encoder 1 semaphore
   if ((sem_encoder1 = sem_open(SEM_ENCODER1, 0)) == SEM_FAILED) {
     perror("sem_open/encoder1");
@@ -72,6 +75,7 @@ int main(int argc, char *argv[]) {
       // Pass the message from the left side to the right
       c.receiveMessage(*blockLeft);
     } else {
+      // Flow left <- right
       std::cout << "Channel from Encoder 2: [" << blockRight->text << "]" << std::endl;
       // Pass the message from the right side to the left
       c.receiveMessage(*blockRight);
@@ -81,29 +85,32 @@ int main(int argc, char *argv[]) {
 
     switch(m->status) {
       case -1:
-        // This message is corrupted - push it back to enc1
-        sprintf(blockLeft->text, blockRight->text, "%s");
-        sprintf(blockLeft->checksum, blockRight->checksum, "%s");
-        blockLeft->status = blockRight->status;
-        std::cout << "Requesting retransmition from Encoder 1..." << std::endl;
-        // Signal encoder 1
-        sem_post(sem_encoder1);
+        // This message is corrupted - push it back
+        if (!*directionFlag) {
+          // memcpy(blockLeft, m, sizeof(*blockLeft));
+          blockLeft->status = -1;
+          std::cout << "Pushing back to Encoder 1..." << std::endl;
+          // Signal encoder 1
+          sem_post(sem_encoder1);
+        } else {
+          // memcpy(blockRight, m, sizeof(*blockRight));
+          blockRight->status = -1;
+          std::cout << "Pushing back to Encoder 2..." << std::endl;
+          // Signal encoder 2
+          sem_post(sem_encoder2);
+        }
         break;
       case 0:
-        // Unprotected message - 1st try -> send it to enc2
+        // Unprotected message or 1st try - regular transmition
       case 1:
-        // Protected message - Control message or 2nd try
+        // Protected message, control message or 2nd try - Transmit safely
         if (*directionFlag) {
-          sprintf(blockRight->text, m->text, "%s");
-          sprintf(blockRight->checksum, m->checksum, "%s");
-          blockRight->status = m->status;
+          memcpy(blockRight, m, sizeof(*blockRight));
           std::cout << "Channel to Encoder 2: [" << blockRight->text << "]" << std::endl;
           // Signal encoder 2
           sem_post(sem_encoder2);
         } else {
-          sprintf(blockLeft->text, m->text, "%s");
-          sprintf(blockLeft->checksum, m->checksum, "%s");
-          blockLeft->status = m->status;
+          memcpy(blockLeft, m, sizeof(*blockLeft));
           std::cout << "Channel to Encoder 1: [" << blockLeft->text << "]" << std::endl;
           // Signal encoder 1
           sem_post(sem_encoder1);
@@ -120,10 +127,10 @@ int main(int argc, char *argv[]) {
   sem_close(sem_encoder2);
   detachBlock(blockLeft);
   detachBlock(blockRight);
-  detachFlagBlock(directionFlag);
+  detachBlock(directionFlag);
 
   // Delete the shared memory after it's no longer used
-  if (destroyBlock(FILENAME, BLOCK_SIZE, ENC1_CHAN_BLOCK_ID)) {
+  if (destroyBlock(FILENAME, sizeof(bool *), ENC1_CHAN_BLOCK_ID)) {
     std::cout << "Destroyed block [" << ENC1_CHAN_BLOCK_ID << "]" << std::endl;
   } else {
     std::cout << "Couldn't destroy block [" << ENC1_CHAN_BLOCK_ID << "]" << std::endl;

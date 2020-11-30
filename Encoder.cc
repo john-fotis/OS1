@@ -3,7 +3,7 @@
 
 #include "Encoder.h"
 
-void calculateMD5(const char * text, char * checksum){
+static void calculateMD5(const char * text, char * checksum){
   static const char hexDigits[17] = "0123456789ABCDEF";
   unsigned char digest[MD5_DIGEST_LENGTH];
   char digest_str[2*MD5_DIGEST_LENGTH];
@@ -25,7 +25,6 @@ Encoder::Encoder(){
   m = new message;
   sprintf(m->text, "%s", "\0");
   sprintf(m->checksum, "%s", "\0");
-  // Assume succesfull delivery on 1st try
   m->status = 0;
 }
 
@@ -33,7 +32,7 @@ Encoder::~Encoder(){
   m = NULL;
 }
 
-void Encoder::receiveMessage(const message &msg) {
+void Encoder::encodeMessage(const message &msg) {
   sprintf(m->text, msg.text, "%s");
   calculateMD5(m->text, m->checksum);
   m->status = msg.status;

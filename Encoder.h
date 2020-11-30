@@ -9,7 +9,7 @@ private:
 public:
   Encoder();
   ~Encoder();
-  void receiveMessage(const message &msg);
+  void encodeMessage(const message &msg);
   bool decodeMessage(const message &m);
   message * getMessage();
   char * deliveryMessage();

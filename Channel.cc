@@ -16,9 +16,7 @@ Channel::~Channel(){
 }
 
 void Channel::receiveMessage(const message &msg){
-  sprintf(m->text, msg.text, "%s");
-  sprintf(m->checksum, msg.checksum, "%s");
-  m->status = msg.status;
+  memcpy(m, &msg, sizeof(message));
 
   // If this is the first transmition:
   if(!m->status){

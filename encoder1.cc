@@ -66,12 +66,10 @@ int main(int argc, char *argv[]) {
     if (*directionFlag) {
       // Normal operation p1 -> p2
       std::cout << "Encoder 1 from P1: [" << blockLeft->text << "]" << std::endl;
-      enc1.receiveMessage(*blockLeft);
+      enc1.encodeMessage(*blockLeft);
       m = enc1.getMessage();
       // Just pass the message to channel
-      sprintf(blockRight->text, m->text, "%s");
-      sprintf(blockRight->checksum, m->checksum, "%s");
-      blockRight->status = m->status;
+      memcpy(blockRight, m, sizeof(*blockRight));
       std::cout << "Encoder 1 to Channel: [" << blockRight->text << "]" << std::endl;
       // Signal channel
       sem_post(sem_channel);
@@ -87,9 +85,7 @@ int main(int argc, char *argv[]) {
         // This is a message from p2
         if (enc1.decodeMessage(*blockRight)) {
           // Message decoded successfully
-          sprintf(blockLeft->text, blockRight->text, "%s");
-          sprintf(blockLeft->checksum, blockRight->checksum, "%s");
-          blockLeft->status = blockRight->status;
+          memcpy(blockLeft, blockRight, sizeof(*blockRight));
 
           std::cout << "Encoder 1 to P1: [" << blockLeft->text << "]" << std::endl;
           // Signal p1
@@ -113,10 +109,10 @@ int main(int argc, char *argv[]) {
   sem_close(sem_channel);
   detachBlock(blockLeft);
   detachBlock(blockRight);
-  detachFlagBlock(directionFlag);
+  detachBlock(directionFlag);
 
   // Delete the shared memory after it's no longer used
-  if (destroyBlock(FILENAME, BLOCK_SIZE, P1_ENC1_BLOCK_ID)) {
+  if (destroyBlock(FILENAME, sizeof(bool *), P1_ENC1_BLOCK_ID)) {
     std::cout << "Destroyed block [" << P1_ENC1_BLOCK_ID << "]" << std::endl;
   } else {
     std::cout << "Couldn't destroy block [" << P1_ENC1_BLOCK_ID << "]" << std::endl;
