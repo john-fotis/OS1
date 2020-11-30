@@ -22,7 +22,6 @@ void Channel::receiveMessage(const message &msg){
   if(!m->status){
     double noise = (double) rand() / (RAND_MAX);
     if (noise < errorRatio){
-      std::cout << noise << std::endl;
       unsigned int i = 0;
       while (i < strlen(m->text)){
         m->text[i] = '-';
